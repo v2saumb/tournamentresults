@@ -49,23 +49,23 @@ CREATE TABLE eventgamerounds(event_id integer REFERENCES events(id) ON DELETE CA
 
 -- Table Matches
 -- This table will contain all who plays against whom and for what event
-CREATE TABLE eventmatches(match_id serial UNIQUE,event_id integer 
-	REFERENCES events ON DELETE CASCADE,
+CREATE TABLE eventmatches(event_id integer REFERENCES events ON DELETE CASCADE,
+	match_id serial UNIQUE,
 	player1_id integer REFERENCES eventplayers(id) ON DELETE CASCADE,
 	player2_id integer REFERENCES eventplayers(id) ON DELETE CASCADE,
-	played boolean DEFAULT false,  PRIMARY KEY (event_id, player1_id, player2_id));
+	played boolean DEFAULT FALSE,
+	PRIMARY KEY (event_id, player1_id, player2_id));
 
 
 -- Table playerscore
 -- Table will contain the score for various eventmatches 
-CREATE TABLE matchscore(event_id integer REFERENCES events(id) ON DELETE CASCADE,
-	match_id integer REFERENCES eventmatches(match_id) ON DELETE CASCADE,
+CREATE TABLE playerscore(match_id integer REFERENCES eventmatches(match_id) ON DELETE CASCADE,
 	player_id integer REFERENCES players ON DELETE CASCADE,
-	score integer DEFAULT 0, 
 	game_number integer REFERENCES eventgamemapper(game_id),
 	round_number integer REFERENCES eventgamerounds(round_id),
 	match_result integer REFERENCES resultmaster(id), 
-	PRIMARY KEY (event_id,player_id,match_id,game_number,round_number));
+	score integer DEFAULT 0, 
+	PRIMARY KEY (player_id,match_id,game_number,round_number));
 
 -- Table eventbyewinners
 -- contains information if any player won by a bye of free win.
@@ -97,15 +97,15 @@ insert into players (player_name,player_email) values ('player 16', 'player16@em
 insert into events (id,name) values(1, 'Chess Championship 2015');
 
 -- event players
-insert into eventplayers (id,event_id,player_id) value (1,1,1);--
+insert into eventplayers (id,event_id,player_id) value (1,1,1);
 insert into eventplayers (id,event_id,player_id) value (1,1,2);
-insert into eventplayers (id,event_id,player_id) value (1,1,3);--
+insert into eventplayers (id,event_id,player_id) value (1,1,3);
 insert into eventplayers (id,event_id,player_id) value (1,1,4);
-insert into eventplayers (id,event_id,player_id) value (1,1,5);--
+insert into eventplayers (id,event_id,player_id) value (1,1,5);
 insert into eventplayers (id,event_id,player_id) value (1,1,6);
-insert into eventplayers (id,event_id,player_id) value (1,1,7);--
+insert into eventplayers (id,event_id,player_id) value (1,1,7);
 insert into eventplayers (id,event_id,player_id) value (1,1,8);
-insert into eventplayers (id,event_id,player_id) value (1,1,9);--
+insert into eventplayers (id,event_id,player_id) value (1,1,9);
 insert into eventplayers (id,event_id,player_id) value (1,1,10);
 insert into eventplayers (id,event_id,player_id) value (1,1,11);
 insert into eventplayers (id,event_id,player_id) value (1,1,12);
@@ -120,12 +120,53 @@ insert into eventgamemapper (event_id,game_id) values (1,1);
 -- eventgamerounds table 
 insert into eventgamerounds (event_id,round_id) values (1,1);
 
--- eventmatches table
-insert into eventmatches (event_id,player1_id,player2_id) values (1,1,3);
-insert into eventmatches (event_id,player1_id,player2_id) values (1,5,7);
-insert into eventmatches (event_id,player1_id,player2_id) values (1,9,11);
-insert into eventmatches (event_id,player1_id,player2_id) values (1,13,15);
-insert into eventmatches (event_id,player1_id,player2_id) values (1,2,4);
-insert into eventmatches (event_id,player1_id,player2_id) values (1,6,8);
-insert into eventmatches (event_id,player1_id,player2_id) values (1,10,12);
-insert into eventmatches (event_id,player1_id,player2_id) values (1,14,16);
+-- eventmatches table assuming matches have been played
+insert into eventmatches (event_id,match_id,player1_id,player2_id,played) values (1,1,1,3,TRUE);
+insert into eventmatches (event_id,match_id,player1_id,player2_id,played) values (1,2,5,7.TRUE);
+insert into eventmatches (event_id,match_id,player1_id,player2_id,played) values (1,3,9,11,TRUE);
+insert into eventmatches (event_id,match_id,player1_id,player2_id,played) values (1,4,13,15,TRUE);
+insert into eventmatches (event_id,match_id,player1_id,player2_id,played) values (1,5,2,4,TRUE);
+insert into eventmatches (event_id,match_id,player1_id,player2_id,played) values (1,6,6,8,TRUE);
+insert into eventmatches (event_id,match_id,player1_id,player2_id,played) values (1,7,10,12,TRUE);
+insert into eventmatches (event_id,match_id,player1_id,player2_id,played) values (1,8,14,16,TRUE);
+
+-- player score assuming the first player won.
+insert into playerscore (match_id, player_id, game_number,
+	round_number, match_result, score) values (1,1,1,1,1,1);
+insert into playerscore (match_id, player_id, game_number,
+	round_number, match_result, score) values (1,3,1,1,2,0);
+
+insert into playerscore (match_id, player_id, game_number,
+	round_number, match_result, score) values (2,5,1,1,1,1);
+insert into playerscore (match_id, player_id, game_number,
+	round_number, match_result, score) values (2,7,1,1,2,0);
+
+insert into playerscore (match_id, player_id, game_number,
+	round_number, match_result, score) values (3,9,1,1,1,1);
+insert into playerscore (match_id, player_id, game_number,
+	round_number, match_result, score) values (3,11,1,1,2,0);
+
+insert into playerscore (match_id, player_id, game_number,
+	round_number, match_result, score) values (4,13,1,1,1,1);
+insert into playerscore (match_id, player_id, game_number,
+	round_number, match_result, score) values (4,15,1,1,2,0);
+
+insert into playerscore (match_id, player_id, game_number,
+	round_number, match_result, score) values (5,2,1,1,1,1);
+insert into playerscore (match_id, player_id, game_number,
+	round_number, match_result, score) values (5,4,1,1,2,0);
+
+insert into playerscore (match_id, player_id, game_number,
+	round_number, match_result, score) values (6,6,1,1,1,1);
+insert into playerscore (match_id, player_id, game_number,
+	round_number, match_result, score) values (6,8,1,1,2,0);
+
+insert into playerscore (match_id, player_id, game_number,
+	round_number, match_result, score) values (7,10,1,1,1,1);
+insert into playerscore (match_id, player_id, game_number,
+	round_number, match_result, score) values (7,12,1,1,2,0);		
+
+insert into playerscore (match_id, player_id, game_number,
+	round_number, match_result, score) values (8,14,1,1,1,1);
+insert into playerscore (match_id, player_id, game_number,
+	round_number, match_result, score) values (8,16,1,1,2,0);
