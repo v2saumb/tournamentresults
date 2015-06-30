@@ -9,6 +9,7 @@
 CREATE TABLE resultmaster(id serial PRIMARY KEY, name TEXT NOT NULL);
 
 -- insert scripts for the results master
+-- do not remove required for the functioning of the program.
 insert into resultmaster (id, name) values (1,'WON');
 insert into resultmaster (id, name) values (2,'LOST');
 insert into resultmaster (id, name) values (3,'DRAW');
@@ -37,15 +38,15 @@ CREATE TABLE eventplayers (id serial UNIQUE,
 -- should have at least one row in this table
 -- and one row for number of games played per match
 CREATE TABLE eventgamemapper(event_id integer REFERENCES events(id) ON DELETE CASCADE,
-	game_id number,
-	UNIQUE (id, event_id) );
+	game_id integer UNIQUE,
+	PRIMARY KEY (game_id, event_id) );
 
 -- Table eventgamerounds
 -- should have at least one row in this table
 -- and one row for number of round played per match
 CREATE TABLE eventgamerounds(event_id integer REFERENCES events(id) ON DELETE CASCADE,
-	round_id number,
-	UNIQUE (id, event_id) );
+	round_id integer UNIQUE,
+	PRIMARY KEY (round_id, event_id) );
 
 -- Table Matches
 -- This table will contain all who plays against whom and for what event
@@ -74,6 +75,23 @@ CREATE TABLE eventbyewinners(event_id integer REFERENCES events(id) ON DELETE CA
 	player_id integer REFERENCES players ON DELETE CASCADE,
 	PRIMARY KEY (event_id,player_id,match_id));  
 
+-- FUNCTIONS
+-- playercount
+-- returns the count of number of players in each event
+CREATE OR REPLACE FUNCTION playercount(integer) RETURNS BIGINT
+    AS 'select count(event_id) as player_count from eventplayers where event_id =$1;'
+    LANGUAGE SQL
+    IMMUTABLE
+    RETURNS NULL ON NULL INPUT;
+
+--VIEWS
+-- Match Details -- lists the matches along with the player names.
+CREATE VIEW match_details AS
+    select e.match_id, a.player_name as player1, 
+    b.player_name as player2 from players a, players b, 
+    eventmatches e where a.player_id = e.player1_id and 
+    b.player_id  = e.player2_id order by e.event_id, e.match_id;
+
 -- insert script for testing
 -- players table
 insert into players (player_name,player_email) values ('player 1', 'player1@email.com');
@@ -97,22 +115,22 @@ insert into players (player_name,player_email) values ('player 16', 'player16@em
 insert into events (id,name) values(1, 'Chess Championship 2015');
 
 -- event players
-insert into eventplayers (id,event_id,player_id) value (1,1,1);
-insert into eventplayers (id,event_id,player_id) value (1,1,2);
-insert into eventplayers (id,event_id,player_id) value (1,1,3);
-insert into eventplayers (id,event_id,player_id) value (1,1,4);
-insert into eventplayers (id,event_id,player_id) value (1,1,5);
-insert into eventplayers (id,event_id,player_id) value (1,1,6);
-insert into eventplayers (id,event_id,player_id) value (1,1,7);
-insert into eventplayers (id,event_id,player_id) value (1,1,8);
-insert into eventplayers (id,event_id,player_id) value (1,1,9);
-insert into eventplayers (id,event_id,player_id) value (1,1,10);
-insert into eventplayers (id,event_id,player_id) value (1,1,11);
-insert into eventplayers (id,event_id,player_id) value (1,1,12);
-insert into eventplayers (id,event_id,player_id) value (1,1,13);
-insert into eventplayers (id,event_id,player_id) value (1,1,14);
-insert into eventplayers (id,event_id,player_id) value (1,1,15);
-insert into eventplayers (id,event_id,player_id) value (1,1,16);
+insert into eventplayers (id,event_id,player_id) values (1,1,1);
+insert into eventplayers (id,event_id,player_id) values (2,1,2);
+insert into eventplayers (id,event_id,player_id) values (3,1,3);
+insert into eventplayers (id,event_id,player_id) values (4,1,4);
+insert into eventplayers (id,event_id,player_id) values (5,1,5);
+insert into eventplayers (id,event_id,player_id) values (6,1,6);
+insert into eventplayers (id,event_id,player_id) values (7,1,7);
+insert into eventplayers (id,event_id,player_id) values (8,1,8);
+insert into eventplayers (id,event_id,player_id) values (9,1,9);
+insert into eventplayers (id,event_id,player_id) values (10,1,10);
+insert into eventplayers (id,event_id,player_id) values (11,1,11);
+insert into eventplayers (id,event_id,player_id) values (12,1,12);
+insert into eventplayers (id,event_id,player_id) values (13,1,13);
+insert into eventplayers (id,event_id,player_id) values (14,1,14);
+insert into eventplayers (id,event_id,player_id) values (15,1,15);
+insert into eventplayers (id,event_id,player_id) values (16,1,16);
 
 -- eventgamemapper table
 insert into eventgamemapper (event_id,game_id) values (1,1);
@@ -122,7 +140,7 @@ insert into eventgamerounds (event_id,round_id) values (1,1);
 
 -- eventmatches table assuming matches have been played
 insert into eventmatches (event_id,match_id,player1_id,player2_id,played) values (1,1,1,3,TRUE);
-insert into eventmatches (event_id,match_id,player1_id,player2_id,played) values (1,2,5,7.TRUE);
+insert into eventmatches (event_id,match_id,player1_id,player2_id,played) values (1,2,5,7,TRUE);
 insert into eventmatches (event_id,match_id,player1_id,player2_id,played) values (1,3,9,11,TRUE);
 insert into eventmatches (event_id,match_id,player1_id,player2_id,played) values (1,4,13,15,TRUE);
 insert into eventmatches (event_id,match_id,player1_id,player2_id,played) values (1,5,2,4,TRUE);
@@ -170,3 +188,6 @@ insert into playerscore (match_id, player_id, game_number,
 	round_number, match_result, score) values (8,14,1,1,1,1);
 insert into playerscore (match_id, player_id, game_number,
 	round_number, match_result, score) values (8,16,1,1,2,0);
+
+
+
