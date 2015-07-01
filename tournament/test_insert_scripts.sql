@@ -20,6 +20,8 @@ insert into players (player_name,player_email) values ('player 14', 'player14@em
 insert into players (player_name,player_email) values ('player 15', 'player15@email.com');
 insert into players (player_name,player_email) values ('player 16', 'player16@email.com');	
 
+--insert into players (player_name,player_email) values ('player 17', 'player17@email.com');		
+
 -- events table
 insert into events (id,name) values(1, 'Chess Championship 2015');
 
@@ -40,6 +42,8 @@ insert into eventplayers (id,event_id,player_id) values (13,1,13);
 insert into eventplayers (id,event_id,player_id) values (14,1,14);
 insert into eventplayers (id,event_id,player_id) values (15,1,15);
 insert into eventplayers (id,event_id,player_id) values (16,1,16);
+
+--insert into eventplayers (id,event_id,player_id) values (17,1,17);	
 
 -- eventgamemapper table
 insert into eventgamemapper (event_id,game_id) values (1,1);

@@ -85,19 +85,32 @@ CREATE OR REPLACE FUNCTION playercount(integer) RETURNS BIGINT
     IMMUTABLE
     RETURNS NULL ON NULL INPUT;
 
+-- matchresultcount
+-- returns the count of number of players in each event
+CREATE OR REPLACE FUNCTION matchresultcount(integer,integer) RETURNS BIGINT
+    AS 'select count(match_id) as result from playerscore where
+     player_id =$1 and match_result = $2;'
+    LANGUAGE SQL
+    IMMUTABLE
+    RETURNS NULL ON NULL INPUT;
+
 --VIEWS
 -- Match Details -- lists the matches along with the player names.
 CREATE OR REPLACE VIEW match_details AS
     select e.match_id, a.player_name as player1, 
     b.player_name as player2 from players a, players b, 
-    eventmatches e where a.player_id = e.player1_id and 
-    b.player_id  = e.player2_id order by e.event_id, e.match_id;
+    eventmatches e , eventplayers ep , eventplayers ep2 where a.player_id = ep.player_id and 
+    ep.id=e.player1_id and  b.player_id  = ep2.player_id 
+    and ep2.id = e.player2_id
+    order by e.event_id, e.match_id;
 
 -- Player Standing
+CREATE OR REPLACE VIEW player_standing AS
+	select p.player_name as playername,sum(ps.game_score) as gamepoints,
+	sum(ps.match_score) as matchpoints,sum(ps.game_score+ps.match_score) as totalpoints,
+	count(ps.match_id) as matchesplayed,matchresultcount(ps.player_id,1) as won,
+	matchresultcount(ps.player_id,2) as lost, matchresultcount(ps.player_id,3) as draw,
+	matchresultcount(ps.player_id,4) as bye from players p left join playerscore ps on ps
+.player_id = p.player_id   group by p.player_name,ps.player_id order by totalpoints desc ;
 
-select p.player_name as playername,sum(ps.game_score) as gamepoints,sum(ps.match_score) as matchpoints,
-sum(ps.game_score+ps.match_score) as totalpoints, count(ps.match_id) as matchesplayed
- from players p, playerscore ps 
- where p.player_id = ps.player_id 
- group by p.player_name,ps.player_id order by totalpoints desc ;
-
+select p.player_name from players p  order by ps.player_id;
