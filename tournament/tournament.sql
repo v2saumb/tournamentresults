@@ -37,16 +37,18 @@ CREATE TABLE eventplayers (id serial UNIQUE,
 -- Table eventgamemapper
 -- should have at least one row in this table
 -- and one row for number of games played per match
-CREATE TABLE eventgamemapper(event_id integer REFERENCES events(id) ON DELETE CASCADE,
-	game_id integer UNIQUE,
-	PRIMARY KEY (game_id, event_id) );
+CREATE TABLE eventgamemapper(game_id serial UNIQUE,
+	event_id integer REFERENCES events(id) ON DELETE CASCADE,
+	game_number integer,
+	PRIMARY KEY (game_number, event_id) );
 
 -- Table eventgamerounds
 -- should have at least one row in this table
 -- and one row for number of round played per match
-CREATE TABLE eventgamerounds(event_id integer REFERENCES events(id) ON DELETE CASCADE,
-	round_id integer UNIQUE,
-	PRIMARY KEY (round_id, event_id) );
+CREATE TABLE eventgamerounds(round_id serial UNIQUE,
+	event_id integer REFERENCES events(id) ON DELETE CASCADE,
+	round_number integer,
+	PRIMARY KEY (round_number, event_id) );
 
 -- Table Matches
 -- This table will contain all who plays against whom and for what event
@@ -60,14 +62,17 @@ CREATE TABLE eventmatches(event_id integer REFERENCES events ON DELETE CASCADE,
 
 -- Table playerscore
 -- Table will contain the score for various eventmatches 
-CREATE TABLE playerscore(match_id integer REFERENCES eventmatches(match_id) ON DELETE CASCADE,
+CREATE TABLE playerscore(event_id integer REFERENCES events ON DELETE CASCADE,
+	match_id integer REFERENCES eventmatches(match_id) ON DELETE CASCADE,
 	player_id integer REFERENCES players ON DELETE CASCADE,
-	game_number integer REFERENCES eventgamemapper(game_id),
-	round_number integer REFERENCES eventgamerounds(round_id),
+	game_number integer, 
+	round_number integer,
 	match_result integer REFERENCES resultmaster(id), 
 	game_score integer DEFAULT 0, 
 	match_score integer DEFAULT 0, 
-	PRIMARY KEY (player_id,match_id,game_number,round_number));
+	PRIMARY KEY (player_id,match_id,game_number,round_number),
+	FOREIGN KEY (game_number, event_id) REFERENCES eventgamemapper (game_number, event_id),
+	FOREIGN KEY (round_number, event_id) REFERENCES eventgamerounds (round_number, event_id));
 
 -- Table eventbyewinners
 -- contains information if any player won by a bye of free win.
@@ -87,9 +92,9 @@ CREATE OR REPLACE FUNCTION playercount(integer) RETURNS BIGINT
 
 -- matchresultcount
 -- returns the count of number of players in each event
-CREATE OR REPLACE FUNCTION matchresultcount(integer,integer) RETURNS BIGINT
-    AS 'select count(match_id) as result from playerscore where
-     player_id =$1 and match_result = $2;'
+CREATE OR REPLACE FUNCTION matchresultcount(integer,integer,integer) RETURNS BIGINT
+    AS 'select coalesce(count(match_id),0) as result from playerscore where
+     player_id =$1 and match_result = $2 and event_id=$3;'
     LANGUAGE SQL
     IMMUTABLE
     RETURNS NULL ON NULL INPUT;
@@ -97,7 +102,7 @@ CREATE OR REPLACE FUNCTION matchresultcount(integer,integer) RETURNS BIGINT
 --VIEWS
 -- Match Details -- lists the matches along with the player names.
 CREATE OR REPLACE VIEW match_details AS
-    select e.match_id, a.player_name as player1, 
+    select e.event_id, e.match_id, a.player_name as player1, 
     b.player_name as player2 from players a, players b, 
     eventmatches e , eventplayers ep , eventplayers ep2 where a.player_id = ep.player_id and 
     ep.id=e.player1_id and  b.player_id  = ep2.player_id 
@@ -106,11 +111,13 @@ CREATE OR REPLACE VIEW match_details AS
 
 -- Player Standing
 CREATE OR REPLACE VIEW player_standing AS
-	select p.player_name as playername,sum(ps.game_score) as gamepoints,
-	sum(ps.match_score) as matchpoints,sum(ps.game_score+ps.match_score) as totalpoints,
-	count(ps.match_id) as matchesplayed,matchresultcount(ps.player_id,1) as won,
-	matchresultcount(ps.player_id,2) as lost, matchresultcount(ps.player_id,3) as draw,
-	matchresultcount(ps.player_id,4) as bye from players p left join playerscore ps on ps
-.player_id = p.player_id   group by p.player_name,ps.player_id order by totalpoints desc ;
+	select p.player_name as playername,sum(coalesce(ps.game_score,0)) as gamepoints,
+	sum(coalesce(ps.match_score,0)) as matchpoints,
+	sum(coalesce(ps.game_score,0)+coalesce(ps.match_score,0)) as totalpoints,
+	count(coalesce(ps.match_id,0)) as matchesplayed,
+	coalesce(matchresultcount(ps.player_id,1),0) as won,
+	coalesce(matchresultcount(ps.player_id,2),0) as lost, 
+	coalesce(matchresultcount(ps.player_id,3),0) as draw,
+	coalesce(matchresultcount(ps.player_id,4),0) as bye
+	from players p left join playerscore ps on ps.player_id = p.player_id   group by p.player_name,ps.player_id order by totalpoints desc ;
 
-select p.player_name from players p  order by ps.player_id;
