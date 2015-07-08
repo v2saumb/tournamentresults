@@ -111,13 +111,15 @@ CREATE OR REPLACE VIEW match_details AS
 
 -- Player Standing
 CREATE OR REPLACE VIEW player_standing AS
-	select p.player_name as playername,sum(coalesce(ps.game_score,0)) as gamepoints,
+	select coalesce(ps.event_id,0) as event_id,p.player_name as playername,sum(coalesce(ps.game_score,0)) as gamepoints,
 	sum(coalesce(ps.match_score,0)) as matchpoints,
 	sum(coalesce(ps.game_score,0)+coalesce(ps.match_score,0)) as totalpoints,
 	count(coalesce(ps.match_id,0)) as matchesplayed,
-	coalesce(matchresultcount(ps.player_id,1),0) as won,
-	coalesce(matchresultcount(ps.player_id,2),0) as lost, 
-	coalesce(matchresultcount(ps.player_id,3),0) as draw,
-	coalesce(matchresultcount(ps.player_id,4),0) as bye
-	from players p left join playerscore ps on ps.player_id = p.player_id   group by p.player_name,ps.player_id order by totalpoints desc ;
+	coalesce(matchresultcount(ps.player_id,1,ps.event_id),0) as won,
+	coalesce(matchresultcount(ps.player_id,2,ps.event_id),0) as lost, 
+	coalesce(matchresultcount(ps.player_id,3,ps.event_id),0) as draw,
+	coalesce(matchresultcount(ps.player_id,4,ps.event_id),0) as bye
+	from players p left join playerscore ps on ps.player_id = p.player_id
+	group by ps.event_id,ps.player_id,p.player_name order by ps.event_id asc, totalpoints desc ;
 
+ 
