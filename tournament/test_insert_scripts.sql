@@ -26,6 +26,17 @@ insert into players (player_name,player_email) values ('player 17', 'player17@em
 insert into events (id,name) values(1, 'Chess Championship 2015');
 insert into events (id,name) values(2, 'Reading Swimming Meet 2015');
 
+-- eventgamemapper table
+insert into eventgamemapper (event_id,game_number) values (1,1);
+
+insert into eventgamemapper (event_id,game_number) values (2,1);	
+
+-- eventgamerounds table 
+insert into eventgamerounds (event_id,round_number) values (1,1);
+insert into eventgamerounds (event_id,round_number) values (1,2);
+
+insert into eventgamerounds (event_id,round_number) values (2,1);
+
 -- event players
 insert into eventplayers (id,event_id,player_id) values (1,1,1);
 insert into eventplayers (id,event_id,player_id) values (2,1,2);
@@ -57,16 +68,7 @@ insert into eventplayers (id,event_id,player_id) values (24,2,8);
 
 --insert into eventplayers (id,event_id,player_id) values (17,1,17);	
 
--- eventgamemapper table
-insert into eventgamemapper (event_id,game_number) values (1,1);
 
-insert into eventgamemapper (event_id,game_number) values (2,1);	
-
--- eventgamerounds table 
-insert into eventgamerounds (event_id,round_number) values (1,1);
-insert into eventgamerounds (event_id,round_number) values (1,2);
-
-insert into eventgamerounds (event_id,round_number) values (2,1);
 
 -- eventmatches table assuming matches have been played event 1
 insert into eventmatches (event_id,match_id,player1_id,player2_id,played) values (1,1,1,3,TRUE);
