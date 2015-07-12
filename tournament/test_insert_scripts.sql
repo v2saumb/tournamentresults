@@ -181,21 +181,21 @@ insert into playerscore (event_id,match_id, player_id, game_number,
 
 -- event 2 round 1 score
 insert into playerscore (event_id,match_id, player_id, game_number,
-	round_number, match_result, game_score,match_score) values (2,17,1,1,1,1,3,3);
+	round_number, match_result, game_score,match_score) values (2,17,17,1,1,1,3,3);
 insert into playerscore (event_id,match_id, player_id, game_number,
-	round_number, match_result, game_score,match_score) values (2,17,2,1,1,2,0,0);
+	round_number, match_result, game_score,match_score) values (2,17,18,1,1,2,0,0);
 
 insert into playerscore (event_id,match_id, player_id, game_number,
-	round_number, match_result, game_score,match_score) values (2,18,3,1,1,1,3,3);
+	round_number, match_result, game_score,match_score) values (2,18,19,1,1,1,3,3);
 insert into playerscore (event_id,match_id, player_id, game_number,
-	round_number, match_result, game_score,match_score) values (2,18,4,1,1,2,0,0);
+	round_number, match_result, game_score,match_score) values (2,18,20,1,1,2,0,0);
 
 insert into playerscore (event_id,match_id, player_id, game_number,
-	round_number, match_result, game_score,match_score) values (2,19,5,1,1,1,3,3);
+	round_number, match_result, game_score,match_score) values (2,19,21,1,1,1,3,3);
 insert into playerscore (event_id,match_id, player_id, game_number,
-	round_number, match_result, game_score,match_score) values (2,19,6,1,1,2,0,0);
+	round_number, match_result, game_score,match_score) values (2,19,22,1,1,2,0,0);
 
 insert into playerscore (event_id,match_id, player_id, game_number,
-	round_number, match_result, game_score,match_score) values (2,20,7,1,1,1,3,3);
+	round_number, match_result, game_score,match_score) values (2,20,23,1,1,1,3,3);
 insert into playerscore (event_id,match_id, player_id, game_number,
-	round_number, match_result, game_score,match_score) values (2,20,8,1,1,2,0,0);
+	round_number, match_result, game_score,match_score) values (2,20,24,1,1,2,0,0);

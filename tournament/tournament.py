@@ -12,11 +12,19 @@ def connect():
     return psycopg2.connect("dbname=tournament")
 
 
-def deleteMatches(matchid):
+def deleteMatches(eventId, matchId):
     """Remove all the match records from the database.
       Args:
-      matchid: The match id for which all the matches have to be deleted.
+      eventId: The event id for which the matches have to be deleted.
+      matchId: The match id for which all the matches have to be deleted.
     """
+    DB = connect()
+    match_cur = DB.cursor()
+    match_cur.execute("""delete from eventmatches where event_id = %s and match_id=%s""", (eventId,matchId))
+    rowcount = match_cur.rowcount
+    DB.commit()
+    DB.close()
+    return rowcount
 
 
 def deletePlayers(playername):
@@ -33,7 +41,6 @@ def deletePlayers(playername):
     player_cursor.execute(query, (name,))
     count = player_cursor.fetchone()[0]
     DB.close()
-
     if count < 1:
         print "No player found with name " + name + " !"
     elif count > 1:
@@ -50,11 +57,12 @@ def deleteUniquePlayer(name):
     """
     DB = connect()
     player_cursor = DB.cursor()
-    print "Deleting Player " + name + " ... \n"
     player_cursor.execute("""delete from players
         where player_name = %s""", (name,))
+    rowcount = player_cursor.rowcount
     DB.commit()
     DB.close()
+    return rowcount
 
 
 def deleteNonUniquePlayers(name):
@@ -126,8 +134,10 @@ def deletePlayersByID(id):
     print "Deleting Player " + id + " ... \n"
     player_cursor.execute("""delete from players
         where player_id = %s""", (id,))
+    rowcount = player_cursor.rowcount
     DB.commit()
     DB.close()
+    return rowcount
 
 
 def countRegisteredPlayers():
@@ -176,19 +186,47 @@ def registerPlayer(name, email):
     DB.close()
 
 
-def playerStandings():
+def playerStandings(eventId):
     """Returns a list of the players and their win records, sorted by wins.
 
-    The first entry in the list should be the player in first place, or a
-    player tied for first place if there is currently a tie.
-
+    The first entry in the list should be the player in first place for
+    the event, or the player tied for first place if there is currently a tie.
+    The results are returned sorted in the following order
+    totalpoints desc ,matchesplayed desc, won desc, lost desc , draw desc
+    ep.event_id asc, ep.player_id asc 
+    Args:
+        eventId: The id for the event for which the player standings are
+        required.
     Returns:
-      A list of tuples, each of which contains (id, name, wins, matches):
-        id: the player's unique id (assigned by the database)
-        name: the player's full name (as registered)
-        wins: the number of matches the player has won
-        matches: the number of matches the player has played
+    A list of tuples, each of which containsthe following:
+        event_id:The event id for the event for which the standings are
+        reuested
+        playerid:the player's id assigned for the event
+        (assigned by the database)
+        player_name: the player's full name (as registered)
+        gamepoints: the total of gam points
+        matchpoints: the total of match points
+        totalpoints: the total score for the player
+        matchesplayed:the number of matches the player has played
+        won: the number of matches the player has won
+        lost:the number of matches the player has lost
+        draw:the number of matches the player that were draw
+        bye:the number of matches the player has a bye win
     """
+    DB = connect()
+    score_cursor = DB.cursor()
+    eventId = bleach.clean(eventId)
+    score_cursor.execute("""select * from player_standing where
+        event_id = %s;""", (eventId,))
+    rows = score_cursor.fetchall()
+    standings = [{'event_id': int(row[0]), 'playerId': int(row[1]),
+    'playername': str(row[2]), 'gamepoints': int(row[3]),
+    'matchpoints': int(row[4]), 'totalpoints': int(row[5]),
+    'matchesplayed': int(row[6]), 'won': int(row[7]),
+    'lost': int(row[8]), 'draws': int(row[9]),
+    'bye': int(row[10])} for row in rows]
+    DB.close()
+    return standings
 
 
 def reportMatch(winner, loser):
@@ -285,9 +323,7 @@ def mapPlayersAndEvent(eventId, playerId):
     DB.close()
     return eventPlayerId
 
-event_id = createevent("Test id ", 1, 1)
-mapPlayersAndEvent(event_id, 1)
-mapPlayersAndEvent(event_id, 2)
-mapPlayersAndEvent(event_id, 3)
-mapPlayersAndEvent(event_id, 4)
-print countEventPlayers(event_id)
+# test code to be deleted later
+rows = playerStandings(2)
+for pstand in rows:
+    print pstand['playername']
