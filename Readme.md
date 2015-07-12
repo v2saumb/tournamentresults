@@ -8,11 +8,15 @@ This project teach us how to create and use databases through the use of databas
 Connect to the PostgreSQL database.  Returns a database connection.
 
 
-### deleteMatches(matchid)
+### deleteMatches(eventId,matchId)
 Remove all the match records from the database.
 
 -	Arguments
-      -	matchid: The match id for which all the matches have to be deleted.
+      -	eventId: The event id for which the matches have to be deleted.
+      - matchId: The match id for which all the matches have to be deleted.
+
+- Returns
+  The number of records deleted
 
 
 ### deletePlayers(playername)
@@ -23,12 +27,16 @@ Remove all the player records from the database.
       -	playername: the player's full name (need not be unique).
 
 
+
 ### deleteUniquePlayer(name)
 
     Deletes all players with a unique name.
 
 -	Arguments
      -	name: the player that has to be deleted.
+
+- Returns
+  The number of records deleted
 
 
 ### deleteNonUniquePlayers(name):
@@ -59,6 +67,9 @@ Deletes one single player from the players table based on the player_id
 -	Arguments
     -	id: the player id that needs to be deleted
 
+- Returns
+  The number of records deleted
+
 
 ### countRegisteredPlayers()
 
@@ -84,19 +95,30 @@ Adds a player to the tournament database. The database will generate a unique id
 	This method return the id of the newly registered player.
 
 
-### playerStandings()
+### playerStandings(eventId)
 Returns a list of the players and their win records, sorted by wins.
 
-    The first entry in the list should be the player in first place, or a
-    player tied for first place if there is currently a tie.
+The first entry in the list should be the player in first place for the event, or the player tied for first place if there is currently a tie. The results are returned sorted in the following order totalpoints desc ,matchesplayed desc, won desc, lost desc , draw desc ep.event_id asc, ep.player_id asc 
 
-    Returns:
-      A list of tuples, each of which contains (id, name, wins, matches):
-        id: the player's unique id (assigned by the database)
-        name: the player's full name (as registered)
-        wins: the number of matches the player has won
-        matches: the number of matches the player has played
-	
+- Arguments
+  - eventId: The event for which the player standings are required
+
+- Returns:
+
+A list of tuples, each of which containsthe following:
+  - event_id:The event id for the event for which the standings are
+  - reuested
+  - playerid:the player's id assigned for the event
+  - (assigned by the database)
+  - player_name: the player's full name (as registered)
+  - gamepoints: the total of gam points
+  - matchpoints: the total of match points
+  - totalpoints: the total score for the player
+  - matchesplayed:the number of matches the player has played
+  - won: the number of matches the player has won
+  - lost:the number of matches the player has lost
+  - draw:the number of matches the player that were draw
+  - bye:the number of matches the player has a bye win 
 
 
 ### reportMatch(winner, loser)
