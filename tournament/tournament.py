@@ -269,29 +269,25 @@ def reportMatch(eventId, matchId, roundNumber, gameNumber, winnerId,
         isBye: true or false depending on if ths was a bye win. remember only
         one bye is allowed per event for a player.
     """
-    isWinner = False
     if isDraw == True and isBye == True:
         print(
             """Error: Match can not be both draw and bye at the same time !""")
         return none
-    if isBye == False and isDraw == False:
-        isWinner = True
 
-    playerOneMatchScore = calculatePlayerMatchScore(
-        eventId, gameNumber, winnerId, loserId, isDraw, isBye, isWinner)
+    playerMatchScores = calculatePlayerMatchScore(
+        eventId, gameNumber, winnerId, loserId, isDraw, isBye)
 
-    if loserId is not None:
-        playerTwoMatchScore = calculatePlayerMatchScore(
-            eventId, gameNumber, winnerId, loserId, isDraw, isBye, False)
 
 # Calculate the scores
     if isDraw == True:
         payerOneScore = 1
         playerTwoScore = 1
         insertPlayerScore(eventId, matchId, winnerId, gameNumber,
-                          roundNumber, 3, payerOneScore, playerOneMatchScore)
+                          roundNumber, 3, payerOneScore,
+                          playerMatchScores["winnerScore"])
         insertPlayerScore(eventId, matchId, loserId, gameNumber,
-                          roundNumber, 3, playerTwoScore, playerTwoMatchScore)
+                          roundNumber, 3, playerTwoScore,
+                          playerMatchScores["loserScore"])
     elif isBye == True:
         """
         Pair players randomly for the first round by shuffling the note cards. 
@@ -307,18 +303,27 @@ def reportMatch(eventId, matchId, roundNumber, gameNumber, winnerId,
         payerOneScore = 3
         playerTwoScore = 1
         insertPlayerScore(eventId, matchId, winnerId, gameNumber,
-                          roundNumber, 1, payerOneScore, playerOneMatchScore)
+                          roundNumber, 1, payerOneScore,
+                          playerMatchScores["winnerScore"])
         insertPlayerScore(eventId, matchId, loserId, gameNumber,
-                          roundNumber, 2, playerTwoScore, playerTwoMatchScore)
+                          roundNumber, 2, playerTwoScore,
+                          playerMatchScores["loserScore"])
 
 
 def calculatePlayerMatchScore(eventId, gameNumber, winnerId, loserId=None,
-                              isDraw=False, isBye=False, isWinner=False):
+                              isDraw=False, isBye=False):
     """calculate the match score for a player;
     Arguments:
-        playerId:   the Id of the player for whom the score is required.
-        eventId:    the event for which scoring is done;
         gameNumber: the gamenumber for which the scoring is done
+        eventId: the event id
+        matchId: the match Id
+        winnerId: the playerID from the eventmatches table. if it is a bye sent
+        the player recieving a bye as winner
+        loserId the playerId from the eventmatches table for the losing player.
+        isDraw: true or false depending on if this was a draw or not. this
+        should be null in case of a bye
+        isBye: true or false depending on if ths was a bye win. remember only
+        one bye is allowed per event for a player.
     Returns:
         0 (zero) if this is not the last game for the match. or match lost
         3 if matches won
@@ -327,7 +332,9 @@ def calculatePlayerMatchScore(eventId, gameNumber, winnerId, loserId=None,
         Match drawn 1 point
         Match lost 0 points
     """
-    score = 0
+    score = {"winnerScore": 0, "loserScore": 0}
+    totalWonP2 = 0
+    totalWon = 0
     games = getMaxGameNumber(eventId)
 
     if games == gameNumber:
@@ -336,6 +343,12 @@ def calculatePlayerMatchScore(eventId, gameNumber, winnerId, loserId=None,
         if loserId is not None:
             currentStandingLoser = getIndividualPlayerStanding(
                 eventId, loserId)
+            matchesPlayedP2 = currentStandingLoser['matchesplayed']
+            wonP2 = currentStandingLoser['won']
+            lostP2 = currentStandingLoser['lost']
+            drawP2 = currentStandingLoser['draws']
+            byeP2 = currentStandingLoser['bye']
+            totalWonP2 = wonP2 + drawP2 + byeP2
 
         matchesPlayed = currentStandngWinner['matchesplayed']
         won = currentStandngWinner['won']
@@ -344,18 +357,26 @@ def calculatePlayerMatchScore(eventId, gameNumber, winnerId, loserId=None,
         bye = currentStandngWinner['bye']
         totalWon = won + draw + bye
 
-        if isWinner == True or isBye == True:
+        if isBye == True:
             totalWon = totalWon + 1
 
-        if totalWon == lost:
-            score = 1
-        elif totalWon > lost:
-            score = 3
+        if isDraw == True:
+            totalWon = totalWon + 1
+            totalWonP2 = totalWonP2 + 1
+
+        if isBye == True:
+            score = {"winnerScore": 3, "loserScore": 0}
+        elif totalWon == totalWonP2:
+            score = {"winnerScore": 1, "loserScore": 1}
+        elif totalWon > totalWonP2:
+            score = {"winnerScore": 3, "loserScore": 0}
+        elif totalWonP2 > totalWon:
+            score = {"winnerScore": 0, "loserScore": 3}
         else:
-            score = 0
+            score = score = {"winnerScore": 0, "loserScore": 0}
         print "this is the last game for the match " + str(totalWon) + str(score)
     else:
-        score = 0
+        score = score = {"winnerScore": 0, "loserScore": 0}
     return score
 
 
@@ -404,17 +425,14 @@ def insertPlayerScore(eventId, matchId, playerId, gameNumber, roundNumber,
         gameScore: points for the game 
         matchScore: points for the match
     """
-    print str(eventId) + str(matchId) + str(playerId) + str(gameNumber) + \
-        + str(roundNumber) + str(matchResult) + \
-        str(gameScore) + str(matchScore)
-    # DB = connect()
-    # event_cursor = DB.cursor()
-    # event_cursor.execute("""insert into playerscore (event_id,match_id, player_id,
-    # game_number, round_number, match_result, game_score,match_score)
-    # values (%s,%s,%s,%s,%s,%s,%s,%s);""", (eventId,matchId, playerId,
-    # gameNumber, roundNumber, matchResult, gameScore,matchScore))
-    # DB.commit()
-    # DB.close()
+    DB = connect()
+    event_cursor = DB.cursor()
+    event_cursor.execute("""insert into playerscore (event_id,match_id, player_id,
+    game_number, round_number, match_result, game_score,match_score)
+    values (%s,%s,%s,%s,%s,%s,%s,%s);""", (eventId, matchId, playerId,
+                                           gameNumber, roundNumber, matchResult, gameScore, matchScore))
+    DB.commit()
+    DB.close()
 
 
 def swissPairings():
@@ -502,11 +520,22 @@ def mapPlayersAndEvent(eventId, playerId):
     DB.close()
     return eventPlayerId
 
+
+def printPlayerScores(eventId):
+    """
+    prints the current player standings for an event
+    """
+    rows = playerStandings(eventId)
+    for pstand in rows:
+        logString = pstand['playername'] + "\t" + str(pstand['won']) + "\t"
+        logString = logString + \
+            str(pstand['lost']) + "\t" + str(pstand['draws'])
+        logString = logString + "\t" + str(pstand['bye'])
+        print logString
+
 # test code to be deleted later
-rows = playerStandings(2)
-for pstand in rows:
-    print pstand['playername']
-print getMaxGameNumber(1)
-print getIndividualPlayerStanding(1, 1)
-# calculatePlayerMatchScore(1,1,1,False,False,False)
-reportMatch(1, 1, 3, 1, 1, 3, False, False)
+printPlayerScores(1)
+
+reportMatch(1, 1, 3, 1, 7, 1, False, False)
+
+printPlayerScores(1)
