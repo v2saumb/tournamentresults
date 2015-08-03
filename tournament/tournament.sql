@@ -18,9 +18,7 @@ insert into resultmaster (id, name) values (4,'BYEWIN');
 
 -- Table Players
 -- Contain detail of the players with their unique id
-CREATE TABLE players(player_id serial PRIMARY KEY,
-	player_name Text not null,
-	player_email Text);
+CREATE TABLE players(player_id serial PRIMARY KEY, player_name Text not null, player_email Text);
 
 -- Table events 
 -- This table contains the names and Ids of the different events
@@ -28,86 +26,59 @@ CREATE TABLE events (id serial PRIMARY KEY,name Text NOT NULL);
 
 -- Table event Players Contains information of which of the registered
 -- players are playing in a  tournament
-CREATE TABLE eventplayers (id serial UNIQUE,
-	event_id integer REFERENCES events ON DELETE CASCADE,
-	player_id integer REFERENCES players (player_id) ON DELETE CASCADE,
-	PRIMARY KEY (event_id, player_id)
-	);
+CREATE TABLE eventplayers (id serial UNIQUE, event_id integer REFERENCES events ON DELETE CASCADE, player_id integer REFERENCES players (player_id) ON DELETE CASCADE, PRIMARY KEY (event_id, player_id));
 
 -- Table eventgamemapper
 -- should have at least one row in this table
 -- and one row for number of games played per match
-CREATE TABLE eventgamemapper(game_id serial UNIQUE,
-	event_id integer REFERENCES events(id) ON DELETE CASCADE,
-	game_number integer,
-	PRIMARY KEY (game_number, event_id) );
+CREATE TABLE eventgamemapper(game_id serial UNIQUE, event_id integer REFERENCES events(id) ON DELETE CASCADE, game_number integer, PRIMARY KEY (game_number, event_id) );
 
 -- Table eventgamerounds
 -- should have at least one row in this table
 -- and one row for number of round played per match
-CREATE TABLE eventgamerounds(round_id serial UNIQUE,
-	event_id integer REFERENCES events(id) ON DELETE CASCADE,
-	round_number integer,
-	PRIMARY KEY (round_number, event_id) );
+CREATE TABLE eventgamerounds(round_id serial UNIQUE, event_id integer REFERENCES events(id) ON DELETE CASCADE, round_number integer, PRIMARY KEY (round_number, event_id) );
 
 -- Table Matches
 -- This table will contain all who plays against whom and for what event
-CREATE TABLE eventmatches(event_id integer REFERENCES events ON DELETE CASCADE,
-	match_id serial UNIQUE,
-	player1_id integer REFERENCES eventplayers(id) ON DELETE CASCADE,
-	player2_id integer REFERENCES eventplayers(id) ON DELETE CASCADE,
-	played boolean DEFAULT FALSE,
-	PRIMARY KEY (event_id, player1_id, player2_id));
+CREATE TABLE eventmatches(event_id integer REFERENCES events ON DELETE CASCADE,	match_id serial UNIQUE, player1_id integer REFERENCES eventplayers(id) ON DELETE CASCADE, player2_id integer REFERENCES eventplayers(id) ON DELETE CASCADE,	played boolean DEFAULT FALSE, PRIMARY KEY (event_id, player1_id, player2_id));
 
 
 -- Table playerscore
 -- Table will contain the score for various eventmatches 
-CREATE TABLE playerscore(event_id integer REFERENCES events ON DELETE CASCADE,
-	match_id integer REFERENCES eventmatches(match_id) ON DELETE CASCADE,
-	player_id integer REFERENCES eventplayers(id) ON DELETE CASCADE,
-	game_number integer, 
-	round_number integer,
-	match_result integer REFERENCES resultmaster(id), 
-	game_score integer DEFAULT 0, 
-	match_score integer DEFAULT 0, 
-	PRIMARY KEY (player_id,match_id,game_number,round_number),
-	FOREIGN KEY (game_number, event_id) REFERENCES eventgamemapper (game_number, event_id),
-	FOREIGN KEY (round_number, event_id) REFERENCES eventgamerounds (round_number, event_id));
+CREATE TABLE playerscore(event_id integer REFERENCES events ON DELETE CASCADE,	match_id integer REFERENCES eventmatches(match_id) ON DELETE CASCADE, player_id integer REFERENCES eventplayers(id) ON DELETE CASCADE, game_number integer, round_number integer, match_result integer REFERENCES resultmaster(id), game_score integer DEFAULT 0, match_score integer DEFAULT 0, PRIMARY KEY (player_id,match_id,game_number,round_number),	FOREIGN KEY (game_number, event_id) REFERENCES eventgamemapper (game_number, event_id),	FOREIGN KEY (round_number, event_id) REFERENCES eventgamerounds (round_number, event_id));
 
 -- Table eventbyewinners
 -- contains information if any player won by a bye of free win.
-CREATE TABLE eventbyewinners(event_id integer REFERENCES events(id) ON DELETE CASCADE,
-	match_id integer REFERENCES eventmatches(match_id) ON DELETE CASCADE,
-	player_id integer REFERENCES players ON DELETE CASCADE,
-	PRIMARY KEY (event_id,player_id,match_id));  
+CREATE TABLE eventbyewinners(event_id integer REFERENCES events(id) ON DELETE CASCADE, match_id integer REFERENCES eventmatches(match_id) ON DELETE CASCADE, player_id integer REFERENCES players ON DELETE CASCADE, PRIMARY KEY (event_id,player_id,match_id));  
 
 -- FUNCTIONS
 -- playercount
 -- returns the count of number of players in each event
-CREATE OR REPLACE FUNCTION playercount(integer) RETURNS BIGINT
-    AS 'select count(event_id) as player_count from eventplayers where event_id =$1;'
-    LANGUAGE SQL
-    IMMUTABLE
-    RETURNS 0 ON NULL INPUT;
+CREATE OR REPLACE FUNCTION playercount(integer) RETURNS BIGINT AS 'select coalesce(count(event_id),0) as player_count from eventplayers where event_id =$1;' LANGUAGE SQL IMMUTABLE RETURNS NULL ON NULL INPUT;
 
 -- matchresultcount
 -- returns the count of number of players in each event
-CREATE OR REPLACE FUNCTION matchresultcount(integer,integer,integer) RETURNS BIGINT
-    AS 'select coalesce(count(match_id),0) as result from playerscore where
-     player_id =$1 and match_result = $2 and event_id=$3;'
-    LANGUAGE SQL
-    IMMUTABLE
-    RETURNS 0 ON NULL INPUT;
+CREATE OR REPLACE FUNCTION matchresultcount(integer,integer,integer) RETURNS BIGINT AS 'select coalesce(count(match_id),0) as result from playerscore where player_id =$1 and match_result = $2 and event_id=$3;'  LANGUAGE SQL IMMUTABLE RETURNS NULL ON NULL INPUT;
 
 -- matchcount
 -- returns the count of number of matches played by a player in an event
-CREATE OR REPLACE FUNCTION playermatchcount(integer,integer) RETURNS BIGINT
-    AS 'select coalesce(count(match_id),0) as result from playerscore where
-     player_id =$1 and event_id=$2;'
-    LANGUAGE SQL
-    IMMUTABLE
-    RETURNS 0 ON NULL INPUT;   
+CREATE OR REPLACE FUNCTION playermatchcount(integer,integer) RETURNS BIGINT AS 'select coalesce(count(match_id),0) as result from playerscore where player_id =$1 and event_id=$2;'LANGUAGE SQL IMMUTABLE RETURNS NULL ON NULL INPUT;   
 
+--getMatchCount
+-- Count the number of matches for an event.
+CREATE OR REPLACE FUNCTION getMatchCount(integer) RETURNS BIGINT AS 'select coalesce(count(match_id),0) as totalMatches from eventmatches where event_id = $1;' LANGUAGE SQL IMMUTABLE RETURNS NULL ON NULL INPUT;   
+
+--getMatchesPlayedCount
+-- Count the number of matches for an event.
+CREATE OR REPLACE FUNCTION getMatchesPlayedCount(integer) RETURNS BIGINT AS 'select coalesce(count(match_id),0) as totalMatches from eventmatches where event_id = $1 and played=true;' LANGUAGE SQL IMMUTABLE RETURNS NULL ON NULL INPUT;   
+
+--getTotalGamesCount
+-- Count the number of games allowed per match for an event.
+CREATE OR REPLACE FUNCTION getTotalGamesCount(integer) RETURNS BIGINT AS 'select coalesce(count(event_id),0) totalGames from eventgamemapper where event_id = $1;' LANGUAGE SQL IMMUTABLE RETURNS NULL ON NULL INPUT;   
+
+--getTotalRoundsCount
+-- Count the number of rounds allowed per match for an event.
+CREATE OR REPLACE FUNCTION getTotalRoundsCount(integer) RETURNS BIGINT AS 'select coalesce(count(event_id),0) totalRounds from eventgamerounds where event_id = $1;' LANGUAGE SQL IMMUTABLE RETURNS NULL ON NULL INPUT;   
 
 --VIEWS
 -- Match Details -- lists the matches along with the player names.
@@ -137,5 +108,5 @@ CREATE OR REPLACE VIEW player_standing AS
 	draw desc,ep.event_id asc, ep.player_id asc ;
 
  
-
- 
+-- Match Status.
+--- check for match completion status before parings

@@ -161,8 +161,7 @@ def countEventPlayers(eventid):
     DB = connect()
     player_cursor = DB.cursor()
     eventid = bleach.clean(eventid)
-    query = """select count(event_id) as count from eventplayers
-    where event_id = %s;"""
+    query = """select * from playercount(%s);"""
     player_cursor.execute(query, (eventid,))
     count = player_cursor.fetchone()[0]
     DB.close()
@@ -269,7 +268,7 @@ def reportMatch(eventId, matchId, roundNumber, gameNumber, winnerId,
         isBye: true or false depending on if ths was a bye win. remember only
         one bye is allowed per event for a player.
     """
-    if isDraw == True and isBye == True:
+    if isDraw is True and isBye is True:
         print(
             """Error: Match can not be both draw and bye at the same time !""")
         return none
@@ -279,16 +278,14 @@ def reportMatch(eventId, matchId, roundNumber, gameNumber, winnerId,
 
 
 # Calculate the scores
-    if isDraw == True:
-        payerOneScore = 1
-        playerTwoScore = 1
+    if isDraw is True:
         insertPlayerScore(eventId, matchId, winnerId, gameNumber,
-                          roundNumber, 3, payerOneScore,
+                          roundNumber, 3, 1,
                           playerMatchScores["winnerScore"])
         insertPlayerScore(eventId, matchId, loserId, gameNumber,
-                          roundNumber, 3, playerTwoScore,
+                          roundNumber, 3, 1,
                           playerMatchScores["loserScore"])
-    elif isBye == True:
+    elif isBye is True:
         """
         Pair players randomly for the first round by shuffling the note cards. 
         Keep the paired cards together for the rest of the round. If you have
@@ -300,14 +297,15 @@ def reportMatch(eventId, matchId, roundNumber, gameNumber, winnerId,
             eventId, matchId, winnerId, gameNumber, roundNumber, 4, 6, 3)
     else:
         #   insert winner score
-        payerOneScore = 3
-        playerTwoScore = 1
         insertPlayerScore(eventId, matchId, winnerId, gameNumber,
-                          roundNumber, 1, payerOneScore,
+                          roundNumber, 1, 3,
                           playerMatchScores["winnerScore"])
+        #   insert loser score
         insertPlayerScore(eventId, matchId, loserId, gameNumber,
-                          roundNumber, 2, playerTwoScore,
+                          roundNumber, 2, 1,
                           playerMatchScores["loserScore"])
+
+    updateMatchPlayedStatus(matchId, DB)
 
 
 def calculatePlayerMatchScore(eventId, gameNumber, winnerId, loserId=None,
@@ -357,14 +355,14 @@ def calculatePlayerMatchScore(eventId, gameNumber, winnerId, loserId=None,
         bye = currentStandngWinner['bye']
         totalWon = won + draw + bye
 
-        if isBye == True:
+        if isBye is True:
             totalWon = totalWon + 1
 
-        if isDraw == True:
+        if isDraw is True:
             totalWon = totalWon + 1
             totalWonP2 = totalWonP2 + 1
 
-        if isBye == True:
+        if isBye is True:
             score = {"winnerScore": 3, "loserScore": 0}
         elif totalWon == totalWonP2:
             score = {"winnerScore": 1, "loserScore": 1}
@@ -433,23 +431,6 @@ def insertPlayerScore(eventId, matchId, playerId, gameNumber, roundNumber,
                                            gameNumber, roundNumber, matchResult, gameScore, matchScore))
     DB.commit()
     DB.close()
-
-
-def swissPairings():
-    """Returns a list of pairs of players for the next round of a match.
-
-    Assuming that there are an even number of players registered, each player
-    appears exactly once in the pairings.  Each player is paired with another
-    player with an equal or nearly-equal win record, that is, a player adjacent
-    to him or her in the standings.
-
-    Returns:
-      A list of tuples, each of which contains (id1, name1, id2, name2)
-        id1: the first player's unique id
-        name1: the first player's name
-        id2: the second player's unique id
-        name2: the second player's name
-    """
 
 
 def createevent(eventName, rounds=1, games=1):
@@ -526,6 +507,8 @@ def printPlayerScores(eventId):
     prints the current player standings for an event
     """
     rows = playerStandings(eventId)
+    logString = 'playername \t won \t lost \t draws \t bye'
+    print logString
     for pstand in rows:
         logString = pstand['playername'] + "\t" + str(pstand['won']) + "\t"
         logString = logString + \
@@ -533,9 +516,185 @@ def printPlayerScores(eventId):
         logString = logString + "\t" + str(pstand['bye'])
         print logString
 
+
+def updateMatchPlayedStatus(matchId, DB):
+    """
+    ### updateMatchPlayedStatus(matchId)
+
+    Updates the match played record.
+
+    * Arguments
+        * matchId: the match in question for which the record is to be updated.
+        * DB: The database connection
+
+    * Returns
+        * Returns the number of records updated.
+
+    ---
+    """
+    match_cursor = DB.cursor()
+    match_cursor.execute("""tournament=> update eventmatches set played=true
+         where match_id=%s;""", (matchId,))
+    rowcount = match_cursor.rowcount
+    DB.commit()
+    DB.close()
+    return rowcount
+
+
+def countEventMatches(eventId):
+    """
+        Counts the number of matches for an event.
+
+        *   Arguments 
+                *   eventId: The event Id for which the count is required.
+
+        *   Returns
+                * Returns the count of matches already registered.
+
+    """
+    DB = connect()
+    match_cursor = DB.cursor()
+    query = "select * from getMatchCount(%s);"
+    match_cursor.execute(query, (eventId,))
+    count = match_cursor.fetchone()[0]
+    DB.close()
+    return count
+
+
+def countEventMatchesPlayed(eventId):
+    """
+        Counts the number of matches already played for an event.
+
+        *   Arguments 
+                *   eventId: The event Id for which the count is required.
+
+        *   Returns
+                * Returns the count of matches already registered and played.
+
+    """
+    DB = connect()
+    match_cursor = DB.cursor()
+    query = "select * from getMatchesPlayedCount(%s);"
+    match_cursor.execute(query, (eventId,))
+    count = match_cursor.fetchone()[0]
+    DB.close()
+    return count
+
+
+def countGamesPerRound(eventId):
+    """
+        Counts the number of games played per round for an event.
+
+        *   Arguments 
+                *   eventId: The event Id for which the count is required.
+
+        *   Returns
+                * Returns the count of games played per round for an event.
+
+    """
+    DB = connect()
+    match_cursor = DB.cursor()
+    query = "select * from getTotalGamesCount(%s);"
+    match_cursor.execute(query, (eventId,))
+    count = match_cursor.fetchone()[0]
+    DB.close()
+    return count
+
+
+def countRoundPerEvent(eventId):
+    """
+        Counts the number of rounds played per  event.
+
+        *   Arguments
+                *   eventId: The event Id for which the count is required.
+
+        *   Returns
+                * Returns the count of rounds played per event.
+
+    """
+    DB = connect()
+    match_cursor = DB.cursor()
+    query = "select * from getTotalRoundsCount(%s);"
+    match_cursor.execute(query, (eventId,))
+    count = match_cursor.fetchone()[0]
+    DB.close()
+    return count
+
+
+def swissPairings(eventId):
+    """Returns a list of pairs of players for the next round of a match.
+
+    Assuming that there are an even number of players registered, each player
+    appears exactly once in the pairings.  Each player is paired with another
+    player with an equal or nearly-equal win record, that is, a player adjacent
+    to him or her in the standings.
+
+    Returns:
+      A list of tuples, each of which contains (id1, name1, id2, name2)
+        id1: the first player's unique id
+        name1: the first player's name
+        id2: the second player's unique id
+        name2: the second player's name
+    """
+    parings = ""
+    DB = connect()
+    # count if there are matches already registered.
+    currentMatches = countEventMatches(eventId)
+    matchesPlayed = 0
+    eventPlayerCount = countEventPlayers(eventId)
+    # checkif players are event in number
+    hasEvenPlayerCount = False
+    modPlayers = eventPlayerCount % 2
+    print "-- modPlayers" + str(modPlayers)
+    if modPlayers == 0:
+        hasEvenPlayerCount = True
+    else:
+        hasEvenPlayerCount = False
+
+    print "--Current registered matches " + str(currentMatches)
+    if currentMatches != 0:
+        matchesPlayed = countEventMatchesPlayed(eventId)
+        print "--Mathces already played " + str(matchesPlayed)
+        if currentMatches == matchesPlayed:
+            rows = playerStandings(eventId)
+
+            if hasEvenPlayerCount is True:
+                print "--Event has Even player count"
+                createParings(rows)
+            else:
+                print "--Event has odd player count"
+
+            print ""
+        else:
+            print """-- Previous matches not complete\n
+            Finish all current matches to get correct standings
+            """
+    else:
+        print "--No matches registered generating matches"
+
+    DB.close()
+    return parings
+
+
+def createParings(currentStandings):
+    """
+    Creates the parings for the event.
+
+    *   Arguments
+            *   currentStandings : the events current standings.
+
+    """
+    parings = []
+    counter = 0
+
+    for pstand in currentStandings:
+        parings[counter]['player1'] = pstand['playerId']
+
+
 # test code to be deleted later
 printPlayerScores(1)
 
-reportMatch(1, 1, 3, 1, 7, 1, False, False)
+swissPairings(1)
+# reportMatch(1, 1, 3, 1, 7, 1, False, False)
 
-printPlayerScores(1)
+# printPlayerScores(1)

@@ -237,24 +237,6 @@ This function is used to insert the record for a players match / game result.
     
 ---    
 
-### swissPairings() WORK IN PROGRESS
-    Returns a list of pairs of players for the next round of a match.
-
-    Assuming that there are an even number of players registered, each player
-    appears exactly once in the pairings.  Each player is paired with another
-    player with an equal or nearly-equal win record, that is, a player adjacent
-    to him or her in the standings.
-
-    Returns:
-      A list of tuples, each of which contains (id1, name1, id2, name2)
-        id1: the first player's unique id
-        name1: the first player's name
-        id2: the second player's unique id
-        name2: the second player's name
-   
-
----
-
 ### createevent(eventName, rounds=1, games=1)
     
 Create a new event and return the event ID for it
@@ -305,5 +287,77 @@ Inserts a mapping record for the registered players to an event
 ### printPlayerScores(eventId)
     
 prints the current player standings for an event on screen
+
+---
+
+### updateMatchPlayedStatus(matchId)
+
+Updates the match played record.
+
+* Arguments
+    * matchId: the match in question for which the record is to be updated.
+    * DB: The database connection
+
+* Returns
+    * Returns the number of records updated.
+
+---
+
+### countEventMatches(eventId):
+    
+Counts the number of matches for an event.
+
+*   Arguments 
+        *   eventId: The event Id for which the count is required.
+
+*   Returns
+        * Returns the count of matches already registered.
+
+   
+---
+
+### countEventMatchesPlayed(eventId):
+   
+Counts the number of matches already played for an event.
+
+*   Arguments 
+        *   eventId: The event Id for which the count is required.
+
+*   Returns
+        * Returns the count of matches already registered and played.
+
+   
+---
+
+
+### countGamesPerRound(eventId):
+
+Counts the number of games played per round for an event.
+
+*   Arguments 
+        *   eventId: The event Id for which the count is required.
+
+*   Returns
+        * Returns the count of games played per round for an event.
+
+   
+---
+
+
+### countRoundPerEvent(eventId):
+   
+Counts the number of rounds played per  event.
+
+*   Arguments 
+        *   eventId: The event Id for which the count is required.
+
+*   Returns
+        * Returns the count of rounds played per event.
+
+   
+---
+
+### swissPairings() WORK IN PROGRESS
+
 
 ---
