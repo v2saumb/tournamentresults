@@ -5,6 +5,8 @@
 
 import psycopg2
 import bleach
+import random
+import time
 
 
 def connect():
@@ -234,7 +236,7 @@ def reportMatch(eventId, matchId, roundNumber, gameNumber, winnerId,
     """Records the outcome of a single match between two players.
     An entry for the match should exist in the event matches table.
     If there are more than one rounds for games between the same players
-    per match, multiple entries are allowed. The games and rounds should be 
+    per match, multiple entries are allowed. The games and rounds should be
     mapped in the eventgamemapper and eventgamerounds.
     Scoring is based on http://www.wizards.com/dci/downloads/swiss_pairings.pdf
         Games and matches are worth the following points during Swiss rounds:
@@ -268,6 +270,7 @@ def reportMatch(eventId, matchId, roundNumber, gameNumber, winnerId,
         isBye: true or false depending on if ths was a bye win. remember only
         one bye is allowed per event for a player.
     """
+    DB = connect()
     if isDraw is True and isBye is True:
         print(
             """Error: Match can not be both draw and bye at the same time !""")
@@ -287,7 +290,7 @@ def reportMatch(eventId, matchId, roundNumber, gameNumber, winnerId,
                           playerMatchScores["loserScore"])
     elif isBye is True:
         """
-        Pair players randomly for the first round by shuffling the note cards. 
+        Pair players randomly for the first round by shuffling the note cards.
         Keep the paired cards together for the rest of the round. If you have
         an odd number of players, the player remaining once pairings are
         completed receives a bye, equaling two game wins (6 game points)
@@ -306,6 +309,7 @@ def reportMatch(eventId, matchId, roundNumber, gameNumber, winnerId,
                           playerMatchScores["loserScore"])
 
     updateMatchPlayedStatus(matchId, DB)
+    DB.close()
 
 
 def calculatePlayerMatchScore(eventId, gameNumber, winnerId, loserId=None,
@@ -379,7 +383,7 @@ def calculatePlayerMatchScore(eventId, gameNumber, winnerId, loserId=None,
 
 
 def getIndividualPlayerStanding(eventId, playerId):
-    """ 
+    """
     get the player standing for a single player
       Arguments:
         playerId:   the Id of the player for whom the score is required.
@@ -394,7 +398,7 @@ def getIndividualPlayerStanding(eventId, playerId):
 
 
 def getMaxGameNumber(eventId):
-    """ returns the max number of games allowed per match 
+    """ returns the max number of games allowed per match
     Arguments :
         eventId: the event's id for which information is required.
     Returns:
@@ -414,13 +418,13 @@ def insertPlayerScore(eventId, matchId, playerId, gameNumber, roundNumber,
                       matchResult, gameScore, matchScore):
     """
      Args:
-        eventId: the event id 
+        eventId: the event id
         matchId: the match Id
         playerId: the Id for the player from the eventplayers table
         roundNumber: the round number what is played
         gameNumber: The game number for the round for which the score is recorded
-        matchResult: The result for the player won lost draw or bye 
-        gameScore: points for the game 
+        matchResult: The result for the player won lost draw or bye
+        gameScore: points for the game
         matchScore: points for the match
     """
     DB = connect()
@@ -507,10 +511,11 @@ def printPlayerScores(eventId):
     prints the current player standings for an event
     """
     rows = playerStandings(eventId)
-    logString = 'playername \t won \t lost \t draws \t bye'
+    logString = 'playername \t totalpoints \t won \t lost \t draws \t bye'
     print logString
     for pstand in rows:
-        logString = pstand['playername'] + "\t" + str(pstand['won']) + "\t"
+        logString = pstand['playername'] + "\t" + \
+            str(pstand['totalpoints']) + "\t" + str(pstand['won']) + "\t"
         logString = logString + \
             str(pstand['lost']) + "\t" + str(pstand['draws'])
         logString = logString + "\t" + str(pstand['bye'])
@@ -519,7 +524,7 @@ def printPlayerScores(eventId):
 
 def updateMatchPlayedStatus(matchId, DB):
     """
-    ### updateMatchPlayedStatus(matchId)
+    # updateMatchPlayedStatus(matchId)
 
     Updates the match played record.
 
@@ -533,7 +538,7 @@ def updateMatchPlayedStatus(matchId, DB):
     ---
     """
     match_cursor = DB.cursor()
-    match_cursor.execute("""tournament=> update eventmatches set played=true
+    match_cursor.execute("""update eventmatches set played=true
          where match_id=%s;""", (matchId,))
     rowcount = match_cursor.rowcount
     DB.commit()
@@ -545,7 +550,7 @@ def countEventMatches(eventId):
     """
         Counts the number of matches for an event.
 
-        *   Arguments 
+        *   Arguments
                 *   eventId: The event Id for which the count is required.
 
         *   Returns
@@ -565,7 +570,7 @@ def countEventMatchesPlayed(eventId):
     """
         Counts the number of matches already played for an event.
 
-        *   Arguments 
+        *   Arguments
                 *   eventId: The event Id for which the count is required.
 
         *   Returns
@@ -585,7 +590,7 @@ def countGamesPerRound(eventId):
     """
         Counts the number of games played per round for an event.
 
-        *   Arguments 
+        *   Arguments
                 *   eventId: The event Id for which the count is required.
 
         *   Returns
@@ -660,7 +665,7 @@ def swissPairings(eventId):
 
             if hasEvenPlayerCount is True:
                 print "--Event has Even player count"
-                createParings(rows)
+                createParings(rows, eventId)
             else:
                 print "--Event has odd player count"
 
@@ -671,30 +676,218 @@ def swissPairings(eventId):
             """
     else:
         print "--No matches registered generating matches"
+        createParings(playerStandings(eventId), eventId, True)
 
     DB.close()
     return parings
 
 
-def createParings(currentStandings):
+def createParings(currentStandings, eventId, doIndsert=False):
     """
     Creates the parings for the event.
 
     *   Arguments
             *   currentStandings : the events current standings.
+            *   eventId:    The event Id that will be passed to the DB function
 
     """
     parings = []
     counter = 0
+    rowCounter = 1
+    matchDetails = {'Player1': None, 'Player2': None}
+    groups = createParingGroups(currentStandings)
+    currentPairings = getCurrentParings(eventId)
+    newParing = []
+    for group in groups:
+        group = randomizeGroup(group)
+        rowCounter = 1
+        grplen = len(group)
+        print "--- Group length " + str(grplen)
+        if (grplen % 2) == 0:
+            isGroupOdd = False
+        else:
+            isGroupOdd = True
 
-    for pstand in currentStandings:
-        parings[counter]['player1'] = pstand['playerId']
+        for pstand in group:
+            print "--- Group item " + str(rowCounter)
+            # newParing.insert(
+            # 0, generateRandomPairs(currentPairings, newParing, group))
+            if (rowCounter % 2) == 0:
+                fieldName = 'Player2'
+            else:
+                fieldName = 'Player1'
+
+            print fieldName
+            matchDetails[fieldName] = pstand
+            print matchDetails
+
+            if (rowCounter % 2) == 0:
+                parings.insert(0, matchDetails)
+                print matchDetails
+                # if doIndsert is True:
+                #     insertMatchRecord(eventId, matchDetails)
+
+                matchDetails = {'Player1': None, 'Player2': None}
+            rowCounter += 1
+    print parings
+    return parings
+
+
+def generateRandomPairs(currentPairings, newParing, group):
+    """
+
+    """
+    matchDetails = {'Player1': None, 'Player2': None}
+    groupLen = len(group) - 1
+    millis = int(round(time.time() * 1000))
+    nums = getUniquePair(groupLen, millis)
+    player1_idx = nums[0]
+    player2_idx = nums[1]
+    player1_id = group[player1_idx]['playerId']
+    player2_id = group[player2_idx]['playerId']
+    print "checking " + str(player1_id) + " - " + str(player2_id)
+    if checkParings(currentPairings, player1_id, player2_id, False) is False and checkParings(newParing, player1_id, player2_id, True) is False:
+        matchDetails = {
+            'Player1': group[player1_idx], 'Player2': group[player2_idx]}
+        print "returning " + str(player1_id) + " - " + str(player2_id)
+        return matchDetails
+    else:
+        print "-"
+        return generateRandomPairs(currentPairings, newParing, group)
+
+
+def randomizeGroup(group):
+    """
+        Returns the shuffled group
+
+    """
+    return random.sample(group, len(group))
+
+
+def checkParings(currentPairings, player1, player2, isNew=False):
+    """Checks and returns true and false based on whether the players have played
+     together earlier or not
+    *   Arguments
+            *   currentPairings: the current matches played
+            *   player1: Player 1 id
+            *   player2: Player 2 id
+
+    """
+    result = False
+    option1 = str(player1) + "-" + str(player2)
+    option2 = str(player2) + "-" + str(player1)
+    if isNew is True:
+        for pairs in currentPairings:
+            pairOption1 = str(
+                pairs['Player1']['playerId']) + "-" + str(pairs['Player2']['playerId'])
+            pairOption2 = str(
+                pairs['Player2']['playerId']) + "-" + str(pairs['Player1']['playerId'])
+            print pairOption1 + "==" + option1 + "," + pairOption2 + "==" + option2
+            if pairOption1 in (option1, option2) or pairOption2 in (option2, option1):
+                result = True
+                break
+            elif pairs['Player1']['playerId'] in (player1, player2):
+                result = True
+                break
+            elif pairs['Player2']['playerId'] in (player1, player2):
+                result = True
+                break
+
+    else:
+        for pairs in currentPairings:
+            pairOption1 = str(
+                pairs['player1_id']) + "-" + str(pairs['player2_id'])
+            pairOption2 = str(
+                pairs['player2_id']) + "-" + str(pairs['player1_id'])
+            print "old - " + pairOption1 + "==" + option1 + "," + pairOption2 + "==" + option2
+            if pairOption1 == option1 or pairOption2 == option2 or pairOption1 == option2 or pairOption1 == option1:
+                result = True
+                break
+
+    return result
+
+
+def createParingGroups(currentStandings):
+    """
+       Breaks the standings in smaller groups based on points
+       *   Arguments
+            *   currentStandings : the events current standings.
+    """
+    tempStandings = []
+    tempScore = -1
+    indx = 0
+    newArrry = []
+    while indx < len(currentStandings):
+        if currentStandings[indx]['totalpoints'] != tempScore:
+            tempScore = currentStandings[indx]['totalpoints']
+            if len(newArrry) > 0:
+                print '--pushing new group'
+                tempStandings.insert(0, newArrry)
+                newArrry = []
+
+        newArrry.insert(0, currentStandings[indx])
+        indx += 1
+    tempStandings.insert(0, newArrry)
+    return tempStandings
+
+
+def insertMatchRecord(eventId, paring):
+    """
+    Inserts the match record in the event matches table
+    *   Argument
+            *   eventId: the event Id for which the records are being inserted.
+            *   praring:  Paring for the current players
+
+    *   Returns
+            *   returns the id for the current inserted record
+    """
+    DB = connect()
+    event_cursor = DB.cursor()
+    event_cursor.execute("""insert into eventmatches (event_id,player1_id, player2_id, played)
+    values(%s, %s, %s, False) RETURNING match_id;""", (eventId, paring["Player1"]["playerId"], paring["Player2"]["playerId"]))
+    eventPlayerId = event_cursor.fetchone()[0]
+    DB.commit()
+    DB.close()
+    print eventPlayerId
+    return eventPlayerId
+
+
+def getCurrentParings(eventId):
+    """
+    gets the list of current mappings
+    *   Argument
+            *   eventId: the event Id for which the records are being inserted.
+
+    *   Returns
+            *   returns a list of current mappings
+    """
+    DB = connect()
+    score_cursor = DB.cursor()
+    eventId = bleach.clean(eventId)
+    score_cursor.execute("""select * from eventmatches where
+        event_id = %s and played=true;""", (eventId,))
+    rows = score_cursor.fetchall()
+    currentMatches = [{'event_id': int(row[0]), 'matchId': int(row[1]),
+                       'player1_id': str(row[2]), 'player2_id': int(row[3]),
+                       'played': int(row[4])} for row in rows]
+    DB.close()
+    print currentMatches
+    return currentMatches
 
 
 # test code to be deleted later
 printPlayerScores(1)
 
 swissPairings(1)
-# reportMatch(1, 1, 3, 1, 7, 1, False, False)
+# reportMatch(eventId, matchId, roundNumber, gameNumber, winnerId,
+# loserId = None, isDraw = False, isBye = False):
+# reportMatch(1, 25, 1, 1, 2, 1, False, False)
+# reportMatch(1, 26, 1, 1, 3, 4, False, False)
+# reportMatch(1, 27, 1, 1, 5, 6, True, False)
+# reportMatch(1, 28, 1, 1, 7, 8, False, False)
+# reportMatch(1, 29, 1, 1, 9, 10, True, False)
+# reportMatch(1, 30, 1, 1, 12, 11, False, False)
+# reportMatch(1, 31, 1, 1, 13, 14, False, False)
+# reportMatch(1, 32, 1, 1, 15, 16, False, False)
 
-# printPlayerScores(1)
+printPlayerScores(1)
