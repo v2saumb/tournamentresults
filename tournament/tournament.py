@@ -376,7 +376,6 @@ def calculatePlayerMatchScore(eventId, gameNumber, winnerId, loserId=None,
             score = {"winnerScore": 0, "loserScore": 3}
         else:
             score = score = {"winnerScore": 0, "loserScore": 0}
-        print "this is the last game for the match " + str(totalWon) + str(score)
     else:
         score = score = {"winnerScore": 0, "loserScore": 0}
     return score
@@ -650,6 +649,8 @@ def swissPairings(eventId):
     # checkif players are event in number
     hasEvenPlayerCount = False
     modPlayers = eventPlayerCount % 2
+    rows = playerStandings(eventId)
+    matchPairs = []
     print "-- modPlayers" + str(modPlayers)
     if modPlayers == 0:
         hasEvenPlayerCount = True
@@ -661,28 +662,27 @@ def swissPairings(eventId):
         matchesPlayed = countEventMatchesPlayed(eventId)
         print "--Mathces already played " + str(matchesPlayed)
         if currentMatches == matchesPlayed:
-            rows = playerStandings(eventId)
-
-            if hasEvenPlayerCount is True:
-                print "--Event has Even player count"
-                createParings(rows, eventId)
-            else:
-                print "--Event has odd player count"
-
-            print ""
+            matchPairs = createParings(rows, eventId)
         else:
             print """-- Previous matches not complete\n
             Finish all current matches to get correct standings
             """
     else:
         print "--No matches registered generating matches"
-        createParings(playerStandings(eventId), eventId, True)
+        matchPairs = createParings(rows, eventId)
 
+    if len(matchPairs) > 0:
+        for pair in matchPairs:
+            insertMatchRecord(eventId, pair, DB)
+        matchDetails = {
+            'Player1': {'playerId': 5}, 'Player2': {'playerId': 6}}
+        # insertMatchRecord(eventId, matchDetails, DB)
+    DB.commit()
     DB.close()
     return parings
 
 
-def createParings(currentStandings, eventId, doIndsert=False):
+def createParings(currentStandings, eventId):
     """
     Creates the parings for the event.
 
@@ -691,14 +691,17 @@ def createParings(currentStandings, eventId, doIndsert=False):
             *   eventId:    The event Id that will be passed to the DB function
 
     """
-    parings = []
-    counter = 0
     rowCounter = 1
     matchDetails = {'Player1': None, 'Player2': None}
     groups = createParingGroups(currentStandings)
     currentPairings = getCurrentParings(eventId)
     newParing = []
+    oddManOut = None
     for group in groups:
+        if oddManOut is not None:
+            group.insert(0, oddManOut)
+            oddManOut = None
+
         group = randomizeGroup(group)
         rowCounter = 1
         grplen = len(group)
@@ -708,11 +711,11 @@ def createParings(currentStandings, eventId, doIndsert=False):
         else:
             isGroupOdd = True
 
+        if isGroupOdd is True:
+            oddManOut = group.pop(0)
+
         for pstand in group:
-            print "--- Group item " + str(rowCounter)
-            # newParing.insert(
-            # 0, generateRandomPairs(currentPairings, newParing, group))
-            if (rowCounter % 2) == 0:
+            if rowCounter % 2 == 0:
                 fieldName = 'Player2'
             else:
                 fieldName = 'Player1'
@@ -722,38 +725,33 @@ def createParings(currentStandings, eventId, doIndsert=False):
             print matchDetails
 
             if (rowCounter % 2) == 0:
-                parings.insert(0, matchDetails)
-                print matchDetails
-                # if doIndsert is True:
-                #     insertMatchRecord(eventId, matchDetails)
-
+                newParing.insert(0, matchDetails)
                 matchDetails = {'Player1': None, 'Player2': None}
             rowCounter += 1
-    print parings
-    return parings
 
-
-def generateRandomPairs(currentPairings, newParing, group):
-    """
-
-    """
-    matchDetails = {'Player1': None, 'Player2': None}
-    groupLen = len(group) - 1
-    millis = int(round(time.time() * 1000))
-    nums = getUniquePair(groupLen, millis)
-    player1_idx = nums[0]
-    player2_idx = nums[1]
-    player1_id = group[player1_idx]['playerId']
-    player2_id = group[player2_idx]['playerId']
-    print "checking " + str(player1_id) + " - " + str(player2_id)
-    if checkParings(currentPairings, player1_id, player2_id, False) is False and checkParings(newParing, player1_id, player2_id, True) is False:
-        matchDetails = {
-            'Player1': group[player1_idx], 'Player2': group[player2_idx]}
-        print "returning " + str(player1_id) + " - " + str(player2_id)
-        return matchDetails
+    if verifyPairs(currentPairings, newParing) is True:
+        return newParing
     else:
-        print "-"
-        return generateRandomPairs(currentPairings, newParing, group)
+        return createParings(currentStandings, eventId)
+
+
+def verifyPairs(currentPairings, newParing):
+    """
+    Checks if the new pairs are unique.
+
+    """
+    result = True
+    for pair in newParing:
+        player1_id = pair['Player1']['playerId']
+        player2_id = pair['Player2']['playerId']
+        for cPair in currentPairings:
+            if player1_id == cPair['player1_id']:
+                if player2_id == cPair['player2_id']:
+                    result = False
+            elif player2_id == cPair['player1_id']:
+                if player1_id == cPair['player2_id']:
+                    result = False
+    return result
 
 
 def randomizeGroup(group):
@@ -762,49 +760,6 @@ def randomizeGroup(group):
 
     """
     return random.sample(group, len(group))
-
-
-def checkParings(currentPairings, player1, player2, isNew=False):
-    """Checks and returns true and false based on whether the players have played
-     together earlier or not
-    *   Arguments
-            *   currentPairings: the current matches played
-            *   player1: Player 1 id
-            *   player2: Player 2 id
-
-    """
-    result = False
-    option1 = str(player1) + "-" + str(player2)
-    option2 = str(player2) + "-" + str(player1)
-    if isNew is True:
-        for pairs in currentPairings:
-            pairOption1 = str(
-                pairs['Player1']['playerId']) + "-" + str(pairs['Player2']['playerId'])
-            pairOption2 = str(
-                pairs['Player2']['playerId']) + "-" + str(pairs['Player1']['playerId'])
-            print pairOption1 + "==" + option1 + "," + pairOption2 + "==" + option2
-            if pairOption1 in (option1, option2) or pairOption2 in (option2, option1):
-                result = True
-                break
-            elif pairs['Player1']['playerId'] in (player1, player2):
-                result = True
-                break
-            elif pairs['Player2']['playerId'] in (player1, player2):
-                result = True
-                break
-
-    else:
-        for pairs in currentPairings:
-            pairOption1 = str(
-                pairs['player1_id']) + "-" + str(pairs['player2_id'])
-            pairOption2 = str(
-                pairs['player2_id']) + "-" + str(pairs['player1_id'])
-            print "old - " + pairOption1 + "==" + option1 + "," + pairOption2 + "==" + option2
-            if pairOption1 == option1 or pairOption2 == option2 or pairOption1 == option2 or pairOption1 == option1:
-                result = True
-                break
-
-    return result
 
 
 def createParingGroups(currentStandings):
@@ -831,25 +786,26 @@ def createParingGroups(currentStandings):
     return tempStandings
 
 
-def insertMatchRecord(eventId, paring):
+def insertMatchRecord(eventId, paring, DB):
     """
     Inserts the match record in the event matches table
     *   Argument
             *   eventId: the event Id for which the records are being inserted.
             *   praring:  Paring for the current players
+            *   DB: The database connection
 
     *   Returns
             *   returns the id for the current inserted record
     """
-    DB = connect()
-    event_cursor = DB.cursor()
-    event_cursor.execute("""insert into eventmatches (event_id,player1_id, player2_id, played)
+
+    matchCursor = DB.cursor()
+    matchCursor.execute("""insert into eventmatches (event_id,player1_id, player2_id, played)
     values(%s, %s, %s, False) RETURNING match_id;""", (eventId, paring["Player1"]["playerId"], paring["Player2"]["playerId"]))
-    eventPlayerId = event_cursor.fetchone()[0]
-    DB.commit()
-    DB.close()
-    print eventPlayerId
-    return eventPlayerId
+    matchId = matchCursor.fetchone()[0]
+    print "-- Match record created \n -- MatchId = " + str(matchId) + \
+        "\t" + str(eventId) + "\t" + str(paring["Player1"]["playerId"]) + "\t" + \
+        str(paring["Player2"]["playerId"])
+    return matchId
 
 
 def getCurrentParings(eventId):
@@ -868,10 +824,9 @@ def getCurrentParings(eventId):
         event_id = %s and played=true;""", (eventId,))
     rows = score_cursor.fetchall()
     currentMatches = [{'event_id': int(row[0]), 'matchId': int(row[1]),
-                       'player1_id': str(row[2]), 'player2_id': int(row[3]),
+                       'player1_id': int(row[2]), 'player2_id': int(row[3]),
                        'played': int(row[4])} for row in rows]
     DB.close()
-    print currentMatches
     return currentMatches
 
 
@@ -881,13 +836,13 @@ printPlayerScores(1)
 swissPairings(1)
 # reportMatch(eventId, matchId, roundNumber, gameNumber, winnerId,
 # loserId = None, isDraw = False, isBye = False):
-# reportMatch(1, 25, 1, 1, 2, 1, False, False)
-# reportMatch(1, 26, 1, 1, 3, 4, False, False)
-# reportMatch(1, 27, 1, 1, 5, 6, True, False)
-# reportMatch(1, 28, 1, 1, 7, 8, False, False)
-# reportMatch(1, 29, 1, 1, 9, 10, True, False)
-# reportMatch(1, 30, 1, 1, 12, 11, False, False)
-# reportMatch(1, 31, 1, 1, 13, 14, False, False)
-# reportMatch(1, 32, 1, 1, 15, 16, False, False)
+reportMatch(1, 921, 2, 1, 2, 12, False, False)
+reportMatch(1, 922, 2, 1, 3, 15, False, False)
+reportMatch(1, 923, 2, 1, 13, 7, True, False)
+reportMatch(1, 924, 2, 1, 6, 11, False, False)
+reportMatch(1, 925, 2, 1, 8, 9, True, False)
+reportMatch(1, 926, 2, 1, 5, 4, False, False)
+reportMatch(1, 927, 2, 1, 16, 1, False, False)
+reportMatch(1, 928, 2, 1, 10, 14, False, False)
 
 printPlayerScores(1)
