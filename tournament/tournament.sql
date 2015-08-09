@@ -19,6 +19,8 @@ insert into resultmaster (id, name) values (4,'BYEWIN');
 -- Table Players
 -- Contain detail of the players with their unique id
 CREATE TABLE players(player_id serial PRIMARY KEY, player_name Text not null, player_email Text);
+-- create dummy record this will be used when user receives a bye
+insert into players (player_id,player_name,player_email) values (0,'dummy user', 'dummyuser@myproject.com');
 
 -- Table events 
 -- This table contains the names and Ids of the different events
@@ -54,31 +56,44 @@ CREATE TABLE eventbyewinners(event_id integer REFERENCES events(id) ON DELETE CA
 -- FUNCTIONS
 -- playercount
 -- returns the count of number of players in each event
-CREATE OR REPLACE FUNCTION playercount(integer) RETURNS BIGINT AS 'select coalesce(count(event_id),0) as player_count from eventplayers where event_id =$1;' LANGUAGE SQL IMMUTABLE RETURNS NULL ON NULL INPUT;
+CREATE OR REPLACE FUNCTION playercount(integer) RETURNS BIGINT AS 
+'select coalesce(count(event_id),0) as player_count from eventplayers 
+where event_id =$1 and player_id >0;' LANGUAGE SQL IMMUTABLE RETURNS NULL ON NULL INPUT;
 
 -- matchresultcount
 -- returns the count of number of players in each event
-CREATE OR REPLACE FUNCTION matchresultcount(integer,integer,integer) RETURNS BIGINT AS 'select coalesce(count(match_id),0) as result from playerscore where player_id =$1 and match_result = $2 and event_id=$3;'  LANGUAGE SQL IMMUTABLE RETURNS NULL ON NULL INPUT;
+CREATE OR REPLACE FUNCTION matchresultcount(integer,integer,integer) RETURNS BIGINT AS 
+'select coalesce(count(match_id),0) as result from playerscore where player_id =$1 and 
+match_result = $2 and event_id=$3;'  LANGUAGE SQL IMMUTABLE RETURNS NULL ON NULL INPUT;
 
 -- matchcount
--- returns the count of number of matches played by a player in an event
-CREATE OR REPLACE FUNCTION playermatchcount(integer,integer) RETURNS BIGINT AS 'select coalesce(count(match_id),0) as result from playerscore where player_id =$1 and event_id=$2;'LANGUAGE SQL IMMUTABLE RETURNS NULL ON NULL INPUT;   
+-- returns the count of matches played by a player in an event
+CREATE OR REPLACE FUNCTION playermatchcount(integer,integer) RETURNS BIGINT AS 
+'select coalesce(count(match_id),0) as result from playerscore where player_id =$1 
+and event_id=$2;'LANGUAGE SQL IMMUTABLE RETURNS NULL ON NULL INPUT;   
 
 --getMatchCount
 -- Count the number of matches for an event.
-CREATE OR REPLACE FUNCTION getMatchCount(integer) RETURNS BIGINT AS 'select coalesce(count(match_id),0) as totalMatches from eventmatches where event_id = $1;' LANGUAGE SQL IMMUTABLE RETURNS NULL ON NULL INPUT;   
+CREATE OR REPLACE FUNCTION getMatchCount(integer) RETURNS BIGINT AS 'select coalesce(count(match_id),0) as 
+totalMatches from eventmatches where event_id = $1;' LANGUAGE SQL IMMUTABLE RETURNS NULL ON NULL INPUT;   
 
 --getMatchesPlayedCount
 -- Count the number of matches for an event.
-CREATE OR REPLACE FUNCTION getMatchesPlayedCount(integer) RETURNS BIGINT AS 'select coalesce(count(match_id),0) as totalMatches from eventmatches where event_id = $1 and played=true;' LANGUAGE SQL IMMUTABLE RETURNS NULL ON NULL INPUT;   
+CREATE OR REPLACE FUNCTION getMatchesPlayedCount(integer) RETURNS BIGINT AS
+ 'select coalesce(count(match_id),0) as totalMatches from eventmatches
+  where event_id = $1 and played=true;' LANGUAGE SQL IMMUTABLE RETURNS NULL ON NULL INPUT;   
 
 --getTotalGamesCount
 -- Count the number of games allowed per match for an event.
-CREATE OR REPLACE FUNCTION getTotalGamesCount(integer) RETURNS BIGINT AS 'select coalesce(count(event_id),0) totalGames from eventgamemapper where event_id = $1;' LANGUAGE SQL IMMUTABLE RETURNS NULL ON NULL INPUT;   
+CREATE OR REPLACE FUNCTION getTotalGamesCount(integer) RETURNS BIGINT AS 
+'select coalesce(count(event_id),0) totalGames from eventgamemapper
+ where event_id = $1;' LANGUAGE SQL IMMUTABLE RETURNS NULL ON NULL INPUT;   
 
 --getTotalRoundsCount
 -- Count the number of rounds allowed per match for an event.
-CREATE OR REPLACE FUNCTION getTotalRoundsCount(integer) RETURNS BIGINT AS 'select coalesce(count(event_id),0) totalRounds from eventgamerounds where event_id = $1;' LANGUAGE SQL IMMUTABLE RETURNS NULL ON NULL INPUT;   
+CREATE OR REPLACE FUNCTION getTotalRoundsCount(integer) RETURNS BIGINT AS
+ 'select coalesce(count(event_id),0) totalRounds from eventgamerounds
+  where event_id = $1;' LANGUAGE SQL IMMUTABLE RETURNS NULL ON NULL INPUT;   
 
 --VIEWS
 -- Match Details -- lists the matches along with the player names.
@@ -102,7 +117,7 @@ CREATE OR REPLACE VIEW player_standing AS
 	coalesce(matchresultcount(ps.player_id,3,ep.event_id),0) as draw,
 	coalesce(matchresultcount(ps.player_id,4,ep.event_id),0) as bye
 	from eventplayers ep  left join playerscore ps on ps.player_id = ep.id , players p
-	where p.player_id = ep.player_id
+	where p.player_id = ep.player_id and ep.player_id > 0
 	Group by ep.event_id,p.player_name,ep.id,ps.player_id,ep.player_id 
 	order by totalpoints desc ,matchesplayed desc,won desc, lost desc ,
 	draw desc,ep.event_id asc, ep.player_id asc ;
