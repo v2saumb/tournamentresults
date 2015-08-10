@@ -1,11 +1,9 @@
--- Table definitions for the tournament project.
---
--- Put your SQL 'create table' statements in this file; also 'create view'
--- statements if you choose to use it.
---
-
+-- Database objects for the tournament project.
 -- Table resultmaster
 -- table contains different resutls and their meanings
+drop database tournament;
+CREATE database tournament;
+\c tournament
 CREATE TABLE resultmaster(id serial PRIMARY KEY, name TEXT NOT NULL);
 
 -- insert scripts for the results master
@@ -78,7 +76,7 @@ CREATE OR REPLACE FUNCTION getMatchCount(integer) RETURNS BIGINT AS 'select coal
 totalMatches from eventmatches where event_id = $1;' LANGUAGE SQL IMMUTABLE RETURNS NULL ON NULL INPUT;   
 
 --getMatchesPlayedCount
--- Count the number of matches for an event.
+-- Count the number of matches already played for an event.
 CREATE OR REPLACE FUNCTION getMatchesPlayedCount(integer) RETURNS BIGINT AS
  'select coalesce(count(match_id),0) as totalMatches from eventmatches
   where event_id = $1 and played=true;' LANGUAGE SQL IMMUTABLE RETURNS NULL ON NULL INPUT;   
@@ -123,5 +121,4 @@ CREATE OR REPLACE VIEW player_standing AS
 	draw desc,ep.event_id asc, ep.player_id asc ;
 
  
--- Match Status.
---- check for match completion status before parings
+\d

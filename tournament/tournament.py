@@ -74,7 +74,10 @@ def calculatePlayerMatchScore(eventId, gameNumber, winnerId, loserId=None,
         if isBye is True:
             score = {"winnerScore": 3, "loserScore": 0}
         elif totalWon == totalWonP2:
-            score = {"winnerScore": 1, "loserScore": 1}
+            if games == 1:
+                score = {"winnerScore": 1, "loserScore": 0}
+            else:
+                score = {"winnerScore": 1, "loserScore": 1}
         elif totalWon > totalWonP2:
             score = {"winnerScore": 3, "loserScore": 0}
         elif totalWonP2 > totalWon:
@@ -349,8 +352,6 @@ def createParings(currentStandings, eventId):
 
         if isGroupOdd is True:
             oddManOut = group.pop(0)
-            print "Group is odd popping item ", oddManOut
-
         for pstand in group:
             if rowCounter % 2 == 0:
                 fieldName = 'Player2'
@@ -365,7 +366,6 @@ def createParings(currentStandings, eventId):
             rowCounter += 1
 
     if oddManOut is not None:
-        print "Reporting a bye for popped Item"
         createByeRecord(oddManOut, eventId)
 
     if verifyPairs(currentPairings, newParing) is True:
@@ -389,7 +389,6 @@ def createByeRecord(byePlayer, eventId):
             'Player1': {'playerId': byePlayer['playerId']},
             'Player2': {'playerId': getDummyUserId(eventId)}}
 
-        print "found dummy  ", oddPair
         matchId = insertMatchRecord(eventId, oddPair, DB)
         DB.commit()
         DB.close()
@@ -687,14 +686,38 @@ def getDummyUserId(eventId):
          player_id=0 and event_id=%s;"""
         player_cursor.execute(query, (eventId,))
         player_id = player_cursor.fetchone()[0]
-        print "found dummy  ", player_id
-        DB.commit()
         DB.close()
         return player_id
     except:
         printErrorDetails(
             sys.exc_info(), """There was an error [getDummyUserId] !""")
-        DB.rollback()
+        DB.close()
+
+
+def getEventName(eventId):
+    """
+    Finds and returns the name for the event
+
+    *  Arguments:
+        *  eventId : the eventId
+
+    *   Returns:
+            * The name of the event
+
+    """
+    try:
+        player_id = None
+        DB = connect()
+        player_cursor = DB.cursor()
+        query = """select name from  events where id=%s;"""
+        player_cursor.execute(query, (eventId,))
+        player_id = player_cursor.fetchone()[0]
+        DB.close()
+        return player_id
+    except:
+        printErrorDetails(
+            sys.exc_info(), """There was an error [getDummyUserId] !""")
+        DB.close()
 
 
 def getIndividualPlayerStanding(eventId, playerId):
@@ -848,17 +871,25 @@ def printPlayerScores(eventId):
     prints the current player standings for an event
     """
     rows = playerStandings(eventId)
-    logString = """playername \t-\t totalpoints \t-\t won \t-\t lost \t-\t
-     draws \t-\t bye"""
+    print "\nPlayer Scores for [ ", getEventName(eventId), "]"
+    print "-" * 79
+    logString = "PlayerName".ljust(20)
+    logString += "Points".ljust(10)
+    logString += "won".ljust(10)
+    logString += "lost".ljust(10)
+    logString += "draws".ljust(10)
+    logString += "bye".ljust(9)
     print logString
+    print "-" * 79
     for pstand in rows:
-        logString = pstand['playername'] + "\t-\t" + \
-            str(pstand['totalpoints']) + "\t-\t" + \
-            str(pstand['won']) + "\t-\t"
-        logString = logString + \
-            str(pstand['lost']) + "\t-\t" + str(pstand['draws'])
-        logString = logString + "\t-\t" + str(pstand['bye'])
+        logString = pstand['playername'].ljust(20)
+        logString += str(pstand['totalpoints']).ljust(10)
+        logString += str(pstand['won']).ljust(10)
+        logString += str(pstand['lost']).ljust(10)
+        logString += str(pstand['draws']).ljust(10)
+        logString += str(pstand['bye']).ljust(9)
         print logString
+        print "-" * 79
 
 
 def processDeletion(msgStr, valid_ids, name):
@@ -1047,7 +1078,7 @@ def reportMatch(eventId, matchId, roundNumber, gameNumber, winnerId,
                               playerMatchScores["winnerScore"])
             #   insert loser score
             insertPlayerScore(eventId, matchId, loserId, gameNumber,
-                              roundNumber, 2, 1,
+                              roundNumber, 2, 0,
                               playerMatchScores["loserScore"])
 
         updateMatchPlayedStatus(matchId, DB)
@@ -1068,7 +1099,7 @@ def randomizeGroup(group):
     return random.sample(group, len(group))
 
 
-def showPlayers():
+def showAllPlayers():
     """
     Display the list of players registered
     can be used to when creating event mappings etc
@@ -1090,20 +1121,21 @@ def showPlayers():
 
 def swissPairings(eventId):
     """
-    Inserts pairs of players for the next round of a match.
-    Assuming that there are an even number of players registered, each player
-    appears exactly once in the pairings.  Each player is paired with another
-    player with an equal or nearly-equal win record, that is, a player adjacent
-    to him or her in the standings.
-
-    Returns:
-      A list of tuples, each of which contains (id1, name1, id2, name2)
-        id1: the first player's unique id
-        name1: the first player's name
-        id2: the second player's unique id
-        name2: the second player's name
+    Pairs the players for the next round of a match and inserts the match.
+    records in this process.
+    The function tries to randomly match the players with the similar match
+     records.
+    If the group of players playing in this event are odd then one players
+     receives a bye win that is also recorded during tis process.
+    * Arcuments:
+        * eventId : the event for which the standings are required
+    * Returns:
+        * A list of tuples, each of which contains (Player1,Player2,matchId)
+        * Player1: The first player's details with current standing
+        * Player2: The details for the second with the current standings
+        * matchId: The new matchId for the match between these players
     """
-    parings = ""
+
     DB = connect()
     # count if there are matches already registered.
     currentMatches = countEventMatches(eventId)
@@ -1125,18 +1157,18 @@ def swissPairings(eventId):
         matchPairs = createParings(rows, eventId)
 
     if len(matchPairs) > 0:
+        index = 0
         for pair in matchPairs:
-            insertMatchRecord(eventId, pair, DB)
-
+            matchPairs[index]['matchId'] = insertMatchRecord(
+                eventId, pair, DB)
+            index += 1
     DB.commit()
     DB.close()
-    return parings
+    return matchPairs
 
 
 def updateMatchPlayedStatus(matchId, DB):
     """
-    # updateMatchPlayedStatus(matchId)
-
     Updates the match played record.
 
     * Arguments
